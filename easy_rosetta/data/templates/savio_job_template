@@ -1,0 +1,24 @@
+#!/bin/bash
+#Job name:
+#SBATCH --job-name=<JOB_NAME>
+#
+# Account:
+#SBATCH --account=fc_tardigrade
+#
+# Partition:
+#SBATCH --partition=savio2
+#
+# Request one node:
+#SBATCH --nodes=1
+#
+# Specify number of tasks for use case:
+#SBATCH --ntasks-per-node=<NUM_CORES>
+#
+# Processors per task:
+#SBATCH --cpus-per-task=1
+#
+# Wall clock limit:
+#SBATCH --time=<WALL_CLOCK_LIMIT>
+#
+## Command to run:
+<COMMAND_TO_RUN>

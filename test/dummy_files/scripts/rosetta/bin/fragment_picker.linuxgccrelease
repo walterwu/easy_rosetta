@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "Dry run of fragment picker."

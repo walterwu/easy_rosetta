@@ -1,0 +1,14 @@
+-in:file:fasta <FASTA_FILE>
+-in:file:frag3 <FRAG_3MER_FILE>
+-in:file:frag9 <FRAG_9MER_FILE>
+-abinitio:relax
+-nstruct <NUM_STRUCTS>
+-out:pdb
+-abinitio:increase_cycles 10
+-abinitio:rg_reweight 0.5
+-abinitio::rsd_wt_helix 0.5
+-abinitio::rsd_wt_loop 0.5
+-relax::fast
+-constant_seed
+-jran <RNG_SEED>
+-out:path <OUT_PATH>

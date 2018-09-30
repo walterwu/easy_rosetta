@@ -1,0 +1,7 @@
+CLUSTER_SCRIPT_PATH:/Users/walterwu/Documents/Berkeley/Tardigrades\ Research/easy_rosetta/test/dummy_files/scripts/calibur
+WORKING_PATH:/Users/walterwu/Documents/Berkeley/Tardigrades\ Research/easy_rosetta/test/dummy_files/basepath
+NUM_STRUCTS:4
+NUM_NODES:1
+NUM_CORES:2
+ROSETTA_PATH:/Users/walterwu/Documents/Berkeley/Tardigrades\ Research/easy_rosetta/test/dummy_files/scripts/rosetta/
+SETUP_RUN:TRUE

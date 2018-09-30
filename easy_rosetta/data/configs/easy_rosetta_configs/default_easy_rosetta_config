@@ -1,0 +1,7 @@
+CLUSTER_SCRIPT_PATH:/global/scratch/walterwu/calibur/calibur
+WORKING_PATH:/global/scratch/walterwu/
+NUM_STRUCTS:4
+NUM_NODES:1
+NUM_CORES:2
+ROSETTA_PATH:$ROSETTA3
+SETUP_RUN:FALSE

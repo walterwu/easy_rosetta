@@ -1,0 +1,2 @@
+include easy_rosetta/data/config
+include easy_rosetta/data/templates/*

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "Dry run of jd2 scoring."
