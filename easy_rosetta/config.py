@@ -1,10 +1,165 @@
-from .utils import *
 from enum import Enum
-import pickle
+import json
 import os
+import utils
 
 yes = ["yes", "y"]
 no = ["no", "n"]
+
+class Program(Enum):
+	FRAGMENT_PICKER = 1
+	ABINITIO_RELAX = 2
+	CALIBUR_CLUSTER = 3
+	JD2_SCORE = 4
+	SAVIO_JOB = 5
+
+def print_dict(d):
+	r = json.dumps(d)
+	print(r)
+
+def gen_main_config():
+	"""
+	Generate a default configuration for easy_rosetta
+	Returns a dict of the config.
+	"""
+	config = {}
+	config["working_dir"] = defaults.WORKING_DIR
+	config["rosetta_path"] = defaults.ROSETTA_PATH
+	config["fragment_picker_path"] = defaults.FRAGMENT_PICKER_PATH
+	config["abinitio_relax_path"] = defaults.ABINTIO_RELAX_PATH
+	config["score_path"] = defaults.SCORE_PATH
+	config["cluster_path"] = defaults.CLUSTER_PATH
+	config["fragment_picker"] = gen_fragment_picker_config()
+	config["abinitio_relax"] = gen_abinitio_relax_config()
+	config["savio_job"] = gen_savio_job_config()
+	return config
+
+def gen_fragment_picker_config():
+	"""
+	Generate a default fragment picker flags file in a dictionary representation
+	"""
+	config = {}
+	config["-in::file::vall"] = "${ROSETTA3_TOOLS}/fragment_tools/vall.apr24.2008.extended.gz"
+	config["-in::file::fasta"] = None
+	config["-frags::bounded_protocol"] = None
+	config["-frags::frag_sizes"] = "3 9"
+	config["-frags::n_candidates"] = "200"
+	config["-frags::n_frags"] = 200
+	config["-out::file::frag_prefix"] = None
+	config["-frags::describe_fragments"] = None
+	return config
+
+def gen_abinitio_relax_config():
+	"""
+	Generate a default abinitio relax flags file in a dictionary representation
+	"""
+	config = {}
+	config["-in:file:fasta"] = None
+	config["-in:file:frag3"] = None
+	config["-in:file:frag9"] = None
+	config["-abinitio:relax"] = None
+	config["-nstruct"] = None
+	config["-out:pdb"] = None
+	config["-abinitio:increase_cycles"] = None
+	config["-abinitio:rg_reweight"] = None
+	config["-abinitio::rsd_wt_helix"] = None
+	config["-abinitio::rsd_wt_loop"] = None
+	config["-relax::fast"] = None
+	config["-constant_seed"] = None
+	config["-jran"] = None
+	config["-out:path"] = None
+	return config
+
+def gen_savio_job_config():
+	"""
+	Generate a default savio job file in a dictionary representation
+	"""
+	config = {}
+	config["--job-name"] = None
+	config["--account"] = None
+	config["--partition"] = None
+	config["--nodes"] = None
+	config["--ntasks-per-node"] = None
+	config["--cpus-per-task"] = None
+	config["--time="] = None
+	config["batch_command"] = None
+	return config
+
+def gen_main_config_file(config, target):
+	with open(target, 'w') as fp:
+		data = json.dumps(config)
+		fp.write(data)
+
+def gen_config_file(config, program, target):
+	"""
+	Generate a config file from the specified config dict
+		fragment_picker_config: dictionary config file
+		program: Enum type of program to generate
+		target: location to store flag file
+	"""
+	if program != Program.SAVIO_JOB:
+		with open(target, 'w') as fp:
+			for key, value in config.items():
+				if not value:
+					value = ""
+				fp.write("{} {}\n".format(str(key), str(value)))
+	else:
+		with open(target, 'w') as fp:
+			fp.write("#!/bin/bash\n")
+			for key, value in config.items():
+				if key != "batch_command":
+					if not value:
+						fp.write("#SBATCH {}\n".format(str(key)))
+					else:
+						fp.write("#SBATCH {}={}\n".format(str(key), str(value)))
+				else:
+					fp.write(value)
+
+def parse_config_file(program, target):
+	"""
+	Parse a config file into a dictionary representation
+		program: Enum type of program to parse as
+		target: Input config file
+	This is really very ugly. Don't look. 
+	"""
+	config = {}
+	if program != Program.SAVIO_JOB:
+		# Parse config for non savio job files
+		with open(target, 'r') as fp:
+			lines = fp.readlines()
+			for line in lines:
+				if line.isspace() or line.startswith('#'):
+					continue
+				line = line.strip().replace('\n', '')
+				tokens = line.strip(" ", maxsplit=1)
+				key = tokens[0]
+				value = ""
+				if tokens[1]:
+					value = tokens[1]
+				config[key] = value
+	else:
+		# Parse config for savio job file
+		with open(target, 'r') as fp:
+			lines = fp.readlines()
+			batch_command = ""
+			for line in lines:
+				if line.isspace():
+					continue
+				if line.startswith("#SBATCH "):
+					line = line.strip().replace('\n', '')
+					line = line.replace("#SBATCH ", '')
+					tokens = line.split('=', maxsplit=1)
+					key = tokens[0]
+					value = ""
+					if tokens[1]:
+						value = tokens[1]
+					config[key] = value
+				elif line.startswith("#"):
+					continue
+				else:
+					batch_command += line
+		config["batch_command"] = batch_command
+	return config
 
 def get_config():
 	read_dict = read_config()
@@ -43,157 +198,8 @@ def edit_config(infile=None):
 		write_config("SETUP_RUN", "TRUE")
 		print("Settings have been saved.")
 
-class Protocols(Enum):
-	FRAGMENT_PICKER = 1
-	ABINITIO_RELAX = 2
-	CALIBUR_CLUSTER = 3
-	JD2_SCORE = 4
 
-class EasyRosettaConfig():
-	DEFAULT_CONFIG_FILE = os.path.join(path.dirname(__file__), "data/configs/easy_rosetta_configs/default_easy_rosetta_config")
-	def __init__(self, rosetta_path, calibur_path):
-		self.name = None
-		self.ROSETTA3 = rosetta_path
-		self.FRAGMENT_PICKER_SCRIPT_PATH = path.join(self.ROSETTA3, "bin/fragment_picker.linuxgccrelease")
-		self.ABINITIO_RELAX_SCRIPT_PATH = path.join(self.ROSETTA3, "bin/AbinitioRelax.linuxgccrelease")
-		self.SCORE_SCRIPT_PATH = path.join(self.ROSETTA3, "bin/score_jd2.linuxgccrelease")
-		self.CLUSTER_SCRIPT_PATH = calibur_path
 
-	def save(self):
-		with open(EasyRosettaConfig.DEFAULT_CONFIG_FILE, 'w') as fp:
-			pickle.dump(self, fp, pickle.HIGHEST_PROTOCOL)
-
-	@staticmethod
-	def load(config_name=None):
-		if config_name == None:
-			config_name = EasyRosettaConfig.DEFAULT_CONFIG_FILE
-		config = None
-		with open(config_name, 'r') as fp:
-			config = pickle.load(fp)
-		return config
-
-class ProtocolConfig():
-
-	@classmethod
-	def default_configs(cls, )
-
-	def __init__(self, easyrosetta_config, protocol=protocol):
-		if protocol not in Protocols.__members__:
-			raise ValueError("Protocol " + str(protocol) + " is not supported.")
-		self.easyrosetta_config = easyrosetta_config
-		self.protocol = protocol
-		if protocol == Protocols.FRAGMENT_PICKER:
-			setup_fragmentpicker_protocol()
-		elif protocol == Protocols.ABINITIO_RELAX:
-			setup_abinitiorelax_protocol()
-		elif protocol == Protocols.CALIBUR_CLUSTER:
-			setup_calibur_protocol()
-		elif protocol == Protocols.JD2_SCORE:
-			setup_jd2score_protocol()
-
-	def generate_command_line(self):
-		cmd = self.executable
-		for key, value in self.options_dict:
-			if value != None:
-				if self.protocol == Protocols.CALIBUR_CLUSTER:
-					cmd += " " + str(value)
-				else:
-					cmd += " -" + key + " " + str(value)
-		return cmd
-
-	def config_to_file(self, outfile):
-		with open(outfile, 'w') as fp:
-			for key, value in self.options_dict.items():
-				if value != None:
-					fp.write(key + str(value) + '\n')
-
-	def set_flag(key, value):
-		if key not in self.options_dict:
-			raise ValueError("Nonexistent flag: " + key)
-		self.options_dict[key] = value
-
-	def setup_fragment_picker_protocol(self):
-		self.executable = self.easyrosetta_config.FRAGMENT_PICKER_SCRIPT_PATH
-		self.options_dict = {
-			"in:file:native":None,
-			"in:file:vall":None,
-			"in:file:s":None,
-			"in:file:xyz":None,
-			"in:file:fasta":None,
-			"in:file:pssm":None,
-			"in:file:checkpoint":None,
-			"in:file:talos_phi_psi":None,
-			"in:file:torsion_bin_probs":None,
-			"in:path:database":None,
-			"frags:scoring:config":None,
-			"frags:scoring:profile_score":None,
-			"frags:ss_pred":None,
-			"frags:n_frags":None,
-			"frags:n_candidates":None,
-			"frags:frag_sizes":None,
-			"frags:write_ca_coordinates":None,
-			"frags:allowed_pdb":None,
-			"frags:denied_pdb":None,
-			"frags:describe_fragments":None,
-			"frags:keep_all_protocol":None:,
-			"frags:bounded_protocol":None,
-			"frags:quota_protocol":None,
-			"frags:picking:selecting_rule":None,
-			"frags:picking:quota_config_file":None,
-			"frags:picking:query_pos":None,
-			"constraints:cst_file":None,
-			"out:file:frag_prefix":None,
-		}
-
-	def setup_abinitio_relax_protocol(self):
-		self.executable = self.easyrosetta_config.ABINITIO_RELAX_SCRIPT_PATH
-		self.options_dict = {
-			"-in:file:native":None,
-			"-in:file:fasta":None,
-			"-in:file:frag3":None,
-			"-in:file:frag9":None,
-			"-database":None,
-			"-abinitio:relax":None,
-			"-nstruct":None,
-			"-out:file:silent":None,
-			"-out:pdb":None,
-			"-out:path":None,
-			"-use_filters":None,
-			"-psipred_ss2":None,
-			"-abinitio::increase_cycles":None,
-			"-abinitio::rg_reweight":None,
-			"-abinitio::rsd_wt_helix":None,
-			"-abinitio::rsd_wt_loop":None,
-			"-relax::fast":None,
-			"-kill_hairpins":None,
-			"-constant_seed":None,
-			"-jran":None,
-			"-seed_offset":None,
-		}
-
-	def setup_calibur_protocol(self):
-		self.executable = self.easyrosetta_config.CLUSTER_SCRIPT_PATH
-		self.options_dict = {
-			"pdb_list":None,
-			"threshhold":None,
-		}
-
-	def setup_jd2score_protocol(self):
-		self.executable = self.easyrosetta_config.SCORE_SCRIPT_PATH
-		self.options_dict = {
-			"-score_app:linmin":None,
-			"-rescore:verbose":None,
-			"-in:file:native":None,
-			"-score:weights":None,
-			"-score:patch":None,
-			"-out:nooutput":None,
-			"-out:output":None,
-			"-out:file:score_only":None,
-			"-out:file:scorefile":None,
-			"-out:file:silent":None,
-			"-out:prefix":None,
-			"-scorefile_format":None,
-		}
 
 
 

@@ -1,72 +1,100 @@
-import os
-import sys
 import fileinput
+import json
+import os
+from random import randint
 import shutil
 import subprocess
-from random import randint
+import sys
 from threading import Thread
-from .constants import *
-from .utils import *
 
-BASE_DIR = None
-OUTPUT_DIR = None
-CONFIG_DIR = None
-FASTA_FILE_PATH = None
-PROTEIN_NAME = None
-SETUP = False
-OUTPUT_COMBINED = False
+import defaults
+import utils
 
-def runall(fasta_file, protein_name):
-	run_fragment_picker()
-	run_abinitio_relax()
-	run_abinitio_postprocessing()
+def runall(config):
+	"""
+	Run all protein modeling steps:
+	1. Pick fragments and generate fragment files
+	2. Run abinitio relax protocol
+	3. Choose the best decoy from generated decoys
+	"""
+	run_fragment_picker(config)
+	run_abinitio_relax(config)
+	run_postprocessing()
 
-def run_abinitio_postprocessing():
-	scores_dict = run_score_function()
-	top_cluster, num_in_cluster = run_cluster_function()
-	select_top_decoy(scores_dict, top_cluster, num_in_cluster)
-
-def run_fragment_picker(fasta_file, protein_name):
-	setup(fasta_file, protein_name)
-	fragment_flags_file = generate_fragment_flags()
-	command = shellify_path(FRAGMENT_PICKER_SCRIPT_PATH) + " @" + fragment_flags_file
-	p = subprocess.Popen(command, shell=True, cwd=BASE_DIR)
+def run_fragment_picker(config):
+	"""
+	Run fragment picker protocol. This takes in an amino acid
+	sequence and generates two fragment files (3, 9) to be 
+	used in the abiinito protocol 
+	"""
+	fragment_flags_file = generate_fragment_flags(config)
+	print("Running fragment picker protocol")
+	command = config["fragment_picker_script"] + " @" + fragment_flags_file
+	p = subprocess.Popen(command, shell=True, cwd=config["working_dir"])
 	p.wait()
+	print("Completed fragment picker protocol")
 
-def run_abinitio_relax(fasta_file, protein_name):
-	setup(fasta_file, protein_name)
+def run_abinitio_relax(config):
+	"""
+	Run the abinito relax protocol. Start off worker threads to
+	run the abinitio binary and write results to a directory
+	"""
+	
 	worker_threads = []
-	for i in range(NUM_CORES):
-		thread = Thread(target=abinitio_worker, args=[i], daemon=True)
+	for i in range(config["num_cores"]):
+		thread = Thread(target=abinitio_worker, args=[config, i], daemon=True)
 		worker_threads.append(thread)
 	for thread in worker_threads:
 		thread.start()
 	for thread in worker_threads:
 		thread.join()
 
-def run_score_function():
-	combine_output()
-	working_dir = os.path.join(OUTPUT_DIR, "all")
-	command = shellify_path(SCORE_SCRIPT_PATH) + " -in:file:s *.pdb"
-	p = subprocess.Popen(command, shell=True, cwd=working_dir)
+def run_postprocessing(config):
+	"""
+	Choose the best decoy by scoring the decoys,
+	clustering them and choosing the top decoy from
+	the clusters
+	"""
+	combine_output(config)
+	scores_dict = run_score_function(config)
+	top_cluster, num_in_cluster = run_cluster_function(config)
+	select_top_decoy(config, scores_dict, top_cluster, num_in_cluster)
+
+def run_score_function(config):
+	"""
+	Run scoring function to score each decoy
+	Returns a dictionary of [protein_name: score]
+	"""
+	cwd = os.path.join(config["output_dir"], "all")
+	command = config["score_script"] + " -in:file:s *.pdb"
+	p = subprocess.Popen(command, shell=True, cwd=cwd)
 	p.wait()
-	scores_dict = process_score_results(os.path.join(working_dir, "score.sc"))
+	scores_dict = process_score_results(os.path.join(cwd, "score.sc"))
 	return scores_dict
 
-def run_cluster_function():
-	combine_output()
-	cwd = os.path.join(OUTPUT_DIR, "all")
-	with open(os.path.join(cwd, "pdb_list", 'w')) as fp:
-		for file in os.listdir(os.path.join(OUTPUT_DIR, "all")):
+def run_cluster_function(config):
+	"""
+	Runs clustering algorithm on decoys
+	Returns the top cluster and number of decoys in that cluster
+	"""
+	cwd = os.path.join(config["output_dir"], "all")
+	# Creates a file, pdb_list, which contains newline separated paths to 
+	# all decoys generated
+	with open(os.path.join(cwd, "pdb_list"), 'w') as fp:
+		for file in os.listdir(cwd):
 			fp.write(file + '\n')
-	calibur_results_path = os.path.join(shellify_path(OUTPUT_DIR), "calibur_results")
-	command = shellify_path(CLUSTER_SCRIPT_PATH) + " pdb_list >" + calibur_results_path
+	calibur_results_path = os.path.join(config["output_dir"], "calibur_results")
+	command = config["cluster_script"] + " pdb_list >" + calibur_results_path
 	p = subprocess.Popen(command, shell=True, cwd=cwd)
 	p.wait()
 	top_cluster, num_in_cluster = process_calibur_results(calibur_results_path)
 	return top_cluster, num_in_cluster
 
-def select_top_decoy(score_dict, top_cluster, num_in_cluster):
+def select_top_decoy(config, score_dict, top_cluster, num_in_cluster):
+	"""
+	Given the top cluster and score_dict, select the top decoy
+	by choosing the highest scoring decoy in the top cluster
+	"""
 	min_score = 0
 	decoy_name = None
 	for decoy in top_cluster:
@@ -74,94 +102,154 @@ def select_top_decoy(score_dict, top_cluster, num_in_cluster):
 			min_score = score_dict[decoy]
 			decoy_name = decoy
 	if decoy_name:
-		shutil.copy(os.path.join(OUTPUT_DIR, "all", decoy_name), os.path.join(OUTPUT_DIR, decoy_name))
-		print("The best decoy is " + decoy_name + " with a score of " + str(min_score) + " and cluster size of " + str(num_in_cluster))
+		shutil.copy(os.path.join(config["output_dir"], "all", decoy_name), os.path.join(config["output_dir"], decoy_name))
+		print("The best decoy is " + decoy_name + " with a score of " + str(min_score) +\
+			  " and cluster size of " + str(num_in_cluster))
 	else:
 		print("No suitable decoy found")
 
-def abinitio_worker(worker_number):
-	working_dir = os.path.join(CONFIG_DIR, "worker" + str(worker_number))
-	abinitio_flags_file = generate_abinitio_flags(worker_number)
-	command = shellify_path(ABINITIO_RELAX_SCRIPT_PATH) + " @" + abinitio_flags_file
-	p = subprocess.Popen(command, shell=True, cwd=working_dir)
+def abinitio_worker(config, worker_number):
+	"""
+	worker thread which kicks of abinitio relax protocol
+	"""
+	print("Running abinitio relax for worker {}".format(worker_number))
+	cwd = os.path.join(config["output_dir"], "worker_" + str(worker_number))
+	abinitio_flags_file = generate_abinitio_flags(config, worker_number)
+	command = config["abinitio_relax_script"] + " @" + abinitio_flags_file
+	p = subprocess.Popen(command, shell=True, cwd=cwd)
 	p.wait()
+	print("Completed abinitio relax for worker {}".format(worker_number))
 
-def generate_fragment_flags():
-	fragment_flags_file = os.path.join(CONFIG_DIR, PROTEIN_NAME + "-fragment_flags")
-	shutil.copy(FRAGMENT_FLAGS_TEMPLATE_PATH, fragment_flags_file)
-	file_replace("<FASTA_FILE>", shellify_path(FASTA_FILE_PATH), fragment_flags_file)
-	out_frag_prefix = shellify_path(os.path.join(CONFIG_DIR, PROTEIN_NAME + "_frags"))
-	file_replace("<OUT_FRAG_PREFIX>", out_frag_prefix , fragment_flags_file)
-	out_desc_prefix = shellify_path(os.path.join(CONFIG_DIR, PROTEIN_NAME + "_desc"))
-	file_replace("<OUT_FRAG_DESC_PREFIX>", out_desc_prefix, fragment_flags_file)
+def generate_fragment_flags(config):
+	"""
+	Generate fragment flags file.
+	Uses template stored in FRAGMENT_FLAGS_TEMPLATE_PATH,
+	replacing necessary fillers
+	Copies the flag file to config_dir/protein_name-fragment_flags
+	"""
+	fragment_flags_file = os.path.join(config["config_dir"], config["protein_name"] + "-fragment_flags")
+	print("Generating fragment flags file at {}".format(fragment_flags_file))
+	shutil.copy(defaults.FRAGMENT_FLAGS_TEMPLATE_PATH, fragment_flags_file)
+	utils.file_replace("<FASTA_FILE>", config["fasta_file"], fragment_flags_file)
+	# output will be stored at: config_dir/protein_name_frags.200.3mers
+	# and config_dir/protein_name_frags.200.9mers
+	out_frag_prefix = os.path.join(config["config_dir"], config["protein_name"] + "_frags")
+	utils.file_replace("<OUT_FRAG_PREFIX>", out_frag_prefix , fragment_flags_file)
+	# out_desc file is not used, but we still provide a prefix
+	out_desc_prefix = os.path.join(config["config_dir"], config["protein_name"] + "_desc")
+	utils.file_replace("<OUT_FRAG_DESC_PREFIX>", out_desc_prefix, fragment_flags_file)
+	print("Finished generating fragments flag file.")
 	return fragment_flags_file
 
-def generate_abinitio_flags(worker_number):
-	abinitio_flags_file = os.path.join(CONFIG_DIR, "worker" + str(worker_number), PROTEIN_NAME + "-abinitio_flags")
-	shutil.copy(ABINITIO_FLAGS_TEMPLATE_PATH, abinitio_flags_file)
-	file_replace("<FASTA_FILE>", FASTA_FILE_PATH, abinitio_flags_file)
-	file_replace("<FRAG_3MER_FILE>", CONFIG_DIR + "/" + PROTEIN_NAME + "_frags.200.3mers", abinitio_flags_file)
-	file_replace("<FRAG_9MER_FILE>", CONFIG_DIR + "/" + PROTEIN_NAME + "_frags.200.9mers", abinitio_flags_file)	
-	file_replace("<NUM_STRUCTS>", str(int(NUM_STRUCTS / NUM_CORES)), abinitio_flags_file)
-	file_replace("<RNG_SEED>", str(random_with_N_digits(8)), abinitio_flags_file)
-	out_path = os.path.join(shellify_path(OUTPUT_DIR), "worker" + str(worker_number))
-	file_replace("<OUT_PATH>", out_path, abinitio_flags_file)
+def generate_abinitio_flags(config, worker_number):
+	"""
+	Generate abinitio flags file for worker worker_number.
+	Uses template stored in FRAGMENT_FLAGS_TEMPLATE_PATH,
+	replacing necessary fillers
+	Copies the flag file to config_dir/worker_n/protein_name-abinitio_flags
+	"""
+	# output flags file will be stored at: config_dir/worker_n/protein_name-abinitio_flags
+	abinitio_flags_file = os.path.join(config["config_dir"], "worker_" + str(worker_number),\
+				 					   config["protein_name"] + "-abinitio_flags")
+	print("Generating abinitio flags file at {}".format(abinitio_flags_file))
+	shutil.copy(defaults.ABINITIO_FLAGS_TEMPLATE_PATH, abinitio_flags_file)
+	utils.file_replace("<FASTA_FILE>", config["fasta_file"], abinitio_flags_file)
+	utils.file_replace("<FRAG_3MER_FILE>", config["config_dir"] + "/" + config["protein_name"] +\
+				 "_frags.200.3mers", abinitio_flags_file)
+	utils.file_replace("<FRAG_9MER_FILE>", config["config_dir"] + "/" + config["protein_name"] +\
+				 "_frags.200.9mers", abinitio_flags_file)	
+	num_structs = int(config["num_structs"] / config["num_cores"])
+	utils.file_replace("<NUM_STRUCTS>", str(num_structs), abinitio_flags_file)
+	utils.file_replace("<RNG_SEED>", str(utils.random_with_N_digits(8)), abinitio_flags_file)
+	out_path = os.path.join(config["output_dir"], "worker_" + str(worker_number))
+	utils.file_replace("<OUT_PATH>", out_path, abinitio_flags_file)
+	print("Finished generating abinitio flags file for worker {}".format(worker_number))
 	return abinitio_flags_file
 
-def setup(fasta_file, protein_name):
+def setup(config, fasta_file, protein_name):
+	"""
+	Set up the working environment for easy_rosetta
+	Returns a config dict
+	Layout of working directory:
+
+	working_dir/
+	|--	output/
+	|	|-- worker_1/
+	|	|-- worker_2/
+	|	| ...
+	|	|-- worker_n/
+	|
+	|-- config/
+		|-- fasta_file.fasta
+		|-- config_files
+		|-- worker_1/
+		    |--abinitio_config
+	"""
 	
-	global SETUP
-	global FASTA_FILE_PATH
-	global PROTEIN_NAME
-	global BASE_DIR 
-	global OUTPUT_DIR
-	global CONFIG_DIR
-	
-	if SETUP:
-		return
+	working_dir = config["working_dir"]
+	output_dir = os.path.join(working_dir, "output")
+	config_dir = os.path.join(working_dir, "config")
+	config_file = os.path.join(config_dir, "easy_rosetta.cfg")
+	# Check if a config file already exists
+	if not config["ignore_config"]:
+		print("Checking for existing easy-rosetta config file at {}".format(config_file))
+		if os.path.isfile(config_file):
+			print("Using existing easy-rosetta config found at working directory {}.".format(working_dir))
+			json_config = ""
+			with open(config_file) as fp:
+				json_config = fp.read()
+			config = json.dumps(json_config)
+			print("Finished loading config.")
+			return config
+	# Make top level working directory
+	print("Running setup. Creating easy_rosetta working directory.")
+	os.makedirs(config["working_dir"], exist_ok=True)
+	# Make output and config dirs
+	os.makedirs(output_dir, exist_ok=True)
+	os.makedirs(config_dir, exist_ok=True)
+	config["output_dir"] = output_dir
+	config["config_dir"] = config_dir
+	# Make working directories for each worker process
+	for i in range(config["num_cores"]):
+		output_worker_dir = os.path.join(output_dir, "worker_" + str(i))
+		config_worker_dir = os.path.join(config_dir, "worker_" + str(i))
+		os.makedirs(output_worker_dir, exist_ok=True)
+		os.makedirs(config_worker_dir, exist_ok=True)
+	fasta_file = shutil.copy(fasta_file, working_dir)
+	config["fasta_file"] = fasta_file
+	json_config = json.dumps(config)
+	config_file = os.path.join(config_dir, "easy_rosetta.cfg")
+	with open(config_file, 'w') as fp:
+		fp.write(json_config)
+	print("Finished creating config.")
+	return config
 
-	BASE_DIR = os.path.join(WORKING_PATH, protein_name)
-	OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-	CONFIG_DIR = os.path.join(BASE_DIR, "config")
-	if not os.path.exists(BASE_DIR):
-		os.mkdir(BASE_DIR)
-	if not os.path.exists(OUTPUT_DIR):
-		os.mkdir(OUTPUT_DIR)
-	if not os.path.exists(CONFIG_DIR):
-		os.mkdir(CONFIG_DIR)
-	for i in range(NUM_CORES):
-		output_worker_dir = os.path.join(OUTPUT_DIR, "worker" + str(i))
-		config_worker_dir = os.path.join(CONFIG_DIR, "worker" + str(i))
-		if not os.path.exists(output_worker_dir):
-			os.mkdir(output_worker_dir)
-		if not os.path.exists(config_worker_dir):
-			os.mkdir(config_worker_dir)
-	fasta_file = shutil.copy(fasta_file, BASE_DIR)
-	FASTA_FILE_PATH = fasta_file
-	PROTEIN_NAME = protein_name
-	SETUP = True
-
-def combine_output():
-	global OUTPUT_COMBINED
-	if OUTPUT_COMBINED:
-		return
-
-	target_dir = os.path.join(OUTPUT_DIR, "all")
-	if not os.path.exists(target_dir):
-		os.mkdir(target_dir)
+def combine_output(config):
+	"""
+	Combines output pdb files in the separate worker dirs by
+	moving them into output_dir/all, then renaming and renumbering
+	all of them to S_1.pdb, S_2.pdb, ...S_n.pdb
+	Returns total number of decoys
+	"""
+	print("Combining output")
+	target_dir = os.path.join(config["output_dir"], "all")
+	os.makedirs(target_dir, exist_ok=True)
 	decoy_counter = 0
-	for i in range(NUM_CORES):
-		source_dir = os.path.join(OUTPUT_DIR, "worker" + str(i))
+	for i in range(config["num_cores"]):
+		source_dir = os.path.join(config["output_dir"], "worker_" + str(i))
 		for file in os.listdir(source_dir):
 			updated_filename = "S_" + str(counter) + ".pdb"
 			source = os.path.join(source_dir, file)
 			target = os.path.join(target_dir, updated_filename)
 			shutil.move(source, target)
 			decoy_counter += 1
-	OUTPUT_COMBINED = True
 	return decoy_counter
 	
 def process_score_results(results):
+	"""
+	Takes in a score results file and returns a score_dict 
+	of format {[pdb_name: score]}
+	"""
 	score_dict = {}
 	with open(results) as fp:
 		for i in range(2):

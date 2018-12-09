@@ -61,9 +61,9 @@ def gen_config(args):
 	config["fragment_picker_script"] = defaults.FRAGMENT_PICKER_SCRIPT
 	config["abinitio_relax_script"] = defaults.ABINITIO_RELAX_SCRIPT
 	config["score_script"] = defaults.SCORE_SCRIPT
-	config["cluster_script"] = defaults.CLUSTER_SCRIPT
-	config["num_cores"] = defaults.NUM_CORES
-	config["num_structs"] = defaults.NUM_STRUCTS
+	config["cluster_script"] = args.cluster_script
+	config["num_cores"] = int(args.num_cores)
+	config["num_structs"] = int(args.num_decoys)
 	config["num_nodes"] = defaults.NUM_NODES
 	config["ignore_config"] = args.ignore_config
 	return config
@@ -88,6 +88,12 @@ def get_normalize_args():
 	parser.add_argument("--pick", action="store_true", default=False, help="Choose a top candidate from generated decoys")
 	parser.add_argument("--fasta-file", default=None, help="Input fasta file.")
 	parser.add_argument("--name", default=None, help="Protein name")
+	parser.add_argument("--num-cores", default=defaults.NUM_CORES,\
+						 help="Number of decoys to generate for AbinitioRelax")
+	parser.add_argument("--num-decoys", default=defaults.NUM_STRUCTS,\
+						 help="Number of decoys to generate for AbinitioRelax")
+	parser.add_argument("--cluster-script", default=defaults.CLUSTER_SCRIPT,\
+						 help="Location of the clustering binary")
 	parser.add_argument("--working-dir", default=defaults.WORKING_DIR,\
 						 help="Specify the working directory of easy-rosetta")
 	parser.add_argument("--setup-only", action="store_true", default=False,\
