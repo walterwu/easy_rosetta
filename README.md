@@ -31,6 +31,7 @@ The easiest way to use easy_rosetta is to use the `--run-all` flag:<br />
 python3 easy_rosetta/easy_rosetta.py --run-all --name PROTEIN_NAME --fasta-file FASTA_FILE --working-dir WORKING_DIR
 ```
 If you are looking for an easy way to model a protein, similar to Swiss Model website, then this is it. All you need to specify is the protein name, fasta file, and working directory. The output pdb file will be located in the specified working directory, at `WORKING_DIR/outpur_dir/output.pdb`. 
+Note: You may also need to specify the location of the Calibur script, using the `--score-script` option.
 ### Advanced Usage
 If you wish to further leverage the power of easy_rosetta and by extension, Rosetta3, it is necessary to know a little more about the inner workings of easy_rosetta. easy_rosetta works in three steps:<br />
 1. Fragment picking: generation of fragments for use in AbinitioRelax, using the Rosetta3 fragment picker protocol<br />
