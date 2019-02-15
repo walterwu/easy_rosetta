@@ -195,10 +195,8 @@ def setup(config, fasta_file, protein_name):
 		print("Checking for existing easy-rosetta config file at {}".format(config_file))
 		if os.path.isfile(config_file):
 			print("Using existing easy-rosetta config found at working directory {}.".format(working_dir))
-			json_config = ""
 			with open(config_file) as fp:
-				json_config = fp.read()
-			config = json.dumps(json_config)
+				json_config = json.load(fp)
 			print("Finished loading config.")
 			return config
 	# Make top level working directory
