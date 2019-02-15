@@ -10,7 +10,7 @@ from threading import Thread
 import defaults
 import utils
 
-def runall(config):
+def run_all(config):
 	"""
 	Run all protein modeling steps:
 	1. Pick fragments and generate fragment files
