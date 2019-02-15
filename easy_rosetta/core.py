@@ -19,7 +19,7 @@ def run_all(config):
 	"""
 	run_fragment_picker(config)
 	run_abinitio_relax(config)
-	run_postprocessing()
+	run_postprocessing(config)
 
 def run_fragment_picker(config):
 	"""
