@@ -1,9 +1,27 @@
+import subprocess
 from os import path
 from random import randint
 
 DEFAULT_CONFIG_PATH = path.join(path.dirname(__file__), "data/configs/default_config")
 SESSION_CONFIG_PATH = path.join(path.dirname(__file__), "data/configs/session_config")
 
+def run_cmd(command, ignore_error=False, display_stdout=True):
+	proc = subprocess.Popen(command, shell=True, cwd=None,
+							stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	proc.wait()
+	exitcode = proc.returncode
+	out, err = proc.communicate()
+	if display_stdout:
+		print(out.decode())
+	if not ignore_error and exitcode:
+		print("Command: {} was expected to succeed, returned {}".format(command, exitcode))
+		print("BEGIN STDERROR")
+		print("*" * 20)
+		print(err.decode())
+		print("*" * 20)
+		print("END STDERROR")
+		raise subprocess.SubprocessError
+	
 def pythonify_path(path):
 	return path.replace("\\ ", " ")
 

@@ -180,17 +180,22 @@ def setup(config, fasta_file, protein_name):
 	|	|-- worker_n/
 	|
 	|-- config/
-		|-- fasta_file.fasta
-		|-- config_files
-		|-- worker_1/
-		    |--abinitio_config
+	|	|-- config_files
+	|	|-- worker_1/
+	|	    |-- abinitio_config
+	|-- fasta_file.fasta
 	"""
 	
 	working_dir = config["working_dir"]
 	output_dir = os.path.join(working_dir, "output")
+	print("output_dir: {}".format(output_dir))
 	config_dir = os.path.join(working_dir, "config")
 	config_file = os.path.join(config_dir, "easy_rosetta.cfg")
-	# Check if a config file already exists
+	config["output_dir"] = output_dir
+	config["config_dir"] = config_dir
+	config["fasta_file"] = os.path.join(config_dir, fasta_file)
+
+	# Load config file and return if ignore_config is not true
 	if not config["ignore_config"]:
 		print("Checking for existing easy-rosetta config file at {}".format(config_file))
 		if os.path.isfile(config_file):
@@ -199,27 +204,26 @@ def setup(config, fasta_file, protein_name):
 				config = json.load(fp)
 			print("Finished loading config.")
 			return config
+
 	# Make top level working directory
 	print("Running setup. Creating easy_rosetta working directory.")
-	os.makedirs(config["working_dir"], exist_ok=True)
+	utils.run_cmd("mkdir {}".format(working_dir), ignore_error=True)
+
 	# Make output and config dirs
-	os.makedirs(output_dir, exist_ok=True)
-	os.makedirs(config_dir, exist_ok=True)
-	config["output_dir"] = output_dir
-	config["config_dir"] = config_dir
+	utils.run_cmd("mkdir {}".format(output_dir), ignore_error=True)
+	utils.run_cmd("mkdir {}".format(config_dir), ignore_error=True)
+
 	# Make working directories for each worker process
 	for i in range(config["num_cores"]):
 		output_worker_dir = os.path.join(output_dir, "worker_" + str(i))
 		config_worker_dir = os.path.join(config_dir, "worker_" + str(i))
-		os.makedirs(output_worker_dir, exist_ok=True)
-		os.makedirs(config_worker_dir, exist_ok=True)
-	fasta_file = shutil.copy(fasta_file, working_dir)
-	config["fasta_file"] = fasta_file
-	json_config = json.dumps(config)
+		utils.run_cmd("mkdir {}".format(output_worker_dir), ignore_error=True)
+		utils.run_cmd("mkdir {}".format(config_worker_dir), ignore_error=True)
+	utils.run_cmd("cp {} {}".format(fasta_file, working_dir), ignore_error=True)
 	config_file = os.path.join(config_dir, "easy_rosetta.cfg")
 	with open(config_file, 'w') as fp:
-		fp.write(json_config)
-	print("Finished creating config.")
+		json.dump(config, fp)
+	print("Finished writing config to {}.".format(config_file))
 	return config
 
 def combine_output(config):
