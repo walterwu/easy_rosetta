@@ -80,7 +80,7 @@ def run_cluster_function(config):
     # all decoys generated
     with open(os.path.join(cwd, "pdb_list"), 'w') as fp:
         for file in os.listdir(cwd):
-            fp.write("{} \n".format(file))
+            fp.write("{}\n".format(file))
     calibur_results_path = os.path.join(config["output_dir"], "calibur_results")
     command = "{} pdb_list >{}".format(config["cluster_script"], calibur_results_path)
     p = utils.run_cmd(command, cwd=cwd, display_stdout=False)
