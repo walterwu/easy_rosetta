@@ -56,6 +56,7 @@ def gen_config(args):
     """
     config = {}
     config["name"] = args.name
+    config["fasta_file"] = args.fasta_file
     config["working_dir"] = args.working_dir
     config["rosetta_path"] = defaults.ROSETTA_PATH
     config["fragment_picker_script"] = defaults.FRAGMENT_PICKER_SCRIPT
