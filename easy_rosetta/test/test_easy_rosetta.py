@@ -16,6 +16,17 @@ def setup_test_env():
     fasta_file = os.path.join(defs.TESTING_DIR, defs.TEST_PROTEIN_FASTA)
     open(fasta_file, 'w')
 
+@pytest.fixture
+def config_set(setup_test_env):
+    config = {
+                "name": defs.TEST_PROTEIN_NAME,
+                "fasta_file": defs.TEST_PROTEIN_FASTA,
+                "working_dir": defs.TESTING_DIR,
+                "ignore_config": False,
+                "num_cores": 4, 
+            }
+    core.setup(config)
+
 def test_setup(setup_test_env):
     config = {
                 "name": defs.TEST_PROTEIN_NAME,
@@ -24,7 +35,7 @@ def test_setup(setup_test_env):
                 "ignore_config": False,
                 "num_cores": 4, 
             }
-    core.setup(config, defs.TEST_PROTEIN_FASTA, defs.TEST_PROTEIN_NAME)
+    core.setup(config)
 
     # Checking top level directory structure
     dirs = utils.get_dirs(defs.TESTING_DIR)

@@ -55,7 +55,7 @@ def gen_config(args):
     Returns a dict of the config.
     """
     config = {}
-    config["protein_name"] = args.name
+    config["name"] = args.name
     config["working_dir"] = args.working_dir
     config["rosetta_path"] = defaults.ROSETTA_PATH
     config["fragment_picker_script"] = defaults.FRAGMENT_PICKER_SCRIPT
@@ -71,7 +71,6 @@ def gen_config(args):
 def setup(args):
     config = gen_config(args)
     core.setup(config, args.fasta_file, args.name)
-
 
 def get_normalize_args():
     """

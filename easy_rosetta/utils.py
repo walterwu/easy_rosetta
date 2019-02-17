@@ -5,8 +5,8 @@ from random import randint
 DEFAULT_CONFIG_PATH = path.join(path.dirname(__file__), "data/configs/default_config")
 SESSION_CONFIG_PATH = path.join(path.dirname(__file__), "data/configs/session_config")
 
-def run_cmd(command, ignore_error=False, display_stdout=True):
-    proc = subprocess.Popen(command, shell=True, cwd=None,
+def run_cmd(command, ignore_error=False, display_stdout=True, cwd=None):
+    proc = subprocess.Popen(command, shell=True, cwd=cwd,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     proc.wait()
     exitcode = proc.returncode
