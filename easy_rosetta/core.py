@@ -183,15 +183,13 @@ def setup(config):
     |	    |-- abinitio_config
     |-- fasta_file.fasta
     """
-    name = config["name"]
-    fasta_file = config["fasta_file"]
+   
     working_dir = config["working_dir"]
     output_dir = os.path.join(working_dir, "output")
     config_dir = os.path.join(working_dir, "config")
     config_file = os.path.join(config_dir, "easy_rosetta.cfg")
     config["output_dir"] = output_dir
     config["config_dir"] = config_dir
-    config["fasta_file"] = os.path.join(config_dir, fasta_file)
 
     # Load config file and return if ignore_config is not true
     if not config["ignore_config"]:
@@ -202,6 +200,10 @@ def setup(config):
                 config = json.load(fp)
             print("Finished loading config.")
             return config
+    
+    name = config["name"]
+    fasta_file = config["fasta_file"]
+    config["fasta_file"] = os.path.join(config_dir, fasta_file)
 
     # Make top level working directory
     print("Running setup. Creating easy_rosetta working directory.")

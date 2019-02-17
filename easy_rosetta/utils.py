@@ -12,7 +12,9 @@ def run_cmd(command, ignore_error=False, display_stdout=True, cwd=None):
     exitcode = proc.returncode
     out, err = proc.communicate()
     if display_stdout:
-        print(out.decode())
+        output = out.decode():
+        if output:
+            print(output)
     if not ignore_error and exitcode:
         print("Command: {} was expected to succeed, returned {}".format(command, exitcode))
         print("BEGIN STDERROR")
