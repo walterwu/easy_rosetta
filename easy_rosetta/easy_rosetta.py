@@ -10,40 +10,40 @@ def run_all(args):
     print("Running all")
     _check_modeling_inputs(args)
     config = gen_config(args)
-    config = core.setup(config, args.fasta_file, args.name)
+    config = core.setup(config)
     core.run_all(config)
 
 def fragment_picker(args):
     print("Running fragment picker")
     _check_modeling_inputs(args)
     config = gen_config(args)
-    config = core.setup(config, args.fasta_file, args.name)
+    config = core.setup(config)
     core.run_fragment_picker(config)
 
 def abinitio_relax(args):
     print("Running abinitio relax")
     _check_modeling_inputs(args)
     config = gen_config(args)
-    config = core.setup(config, args.fasta_file, args.name)
+    config = core.setup(config)
     core.run_abinitio_relax(config)
 
 def score(args):
     print("Running score")
     config = gen_config(args)
-    config = core.setup(config, args.fasta_file, args.name)
+    config = core.setup(config)
     core.run_score_function(config)
 
 def cluster(args):
     print("Running cluster")
     config = gen_config(args)
-    config = core.setup(config, args.fasta_file, args.name)
+    config = core.setup(config)
     core.run_cluster_function(config)
 
 def postprocess(args):
     print("Running postprocess")
     _check_modeling_inputs(args)
     config = gen_config(args)
-    config = core.setup(config, args.fasta_file, args.name)
+    config = core.setup(config)
     core.run_postprocessing(config)
     
 def _check_modeling_inputs(args):
