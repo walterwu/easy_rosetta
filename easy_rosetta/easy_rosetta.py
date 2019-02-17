@@ -70,7 +70,7 @@ def gen_config(args):
 
 def setup(args):
     config = gen_config(args)
-    core.setup(config, args.fasta_file, args.name)
+    core.setup(config)
 
 def get_normalize_args():
     """
