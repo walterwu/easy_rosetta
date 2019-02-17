@@ -19,5 +19,5 @@ setup(name='easy_rosetta',
         'easy-rosetta-score=easy_rosetta.main:score',
         'easy-rosetta-cluster=easy_rosetta.main:cluster',
         ],
-    	},
+      },
       zip_safe=False)
