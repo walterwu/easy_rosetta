@@ -115,7 +115,8 @@ def abinitio_worker(config, worker_number):
     cwd = os.path.join(config["output_dir"], "worker_{}".format(worker_number))
     abinitio_flags_file = generate_abinitio_flags(config, worker_number)
     command = "{} @{}".format(config["abinitio_relax_script"], abinitio_flags_file)
-    utils.run_cmd(command, cwd=True, display_stdout=False)
+    p = subprocess.Popen(command, shell=True, cwd=cwd)
+    p.wait()
     print("Completed abinitio relax for worker {}".format(worker_number))
 
 def generate_fragment_flags(config):
