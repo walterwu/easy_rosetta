@@ -184,7 +184,7 @@ def setup(config):
     |-- fasta_file.fasta
     """
    
-    working_dir = config["working_dir"]
+    working_dir = os.path.abspath(config["working_dir"])
     output_dir = os.path.join(working_dir, "output")
     config_dir = os.path.join(working_dir, "config")
     config_file = os.path.join(config_dir, "easy_rosetta.cfg")
