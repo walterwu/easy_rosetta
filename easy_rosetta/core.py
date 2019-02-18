@@ -203,7 +203,7 @@ def setup(config):
     
     name = config["name"]
     fasta_file = config["fasta_file"]
-    config["fasta_file"] = os.path.join(config_dir, fasta_file)
+    config["fasta_file"] = os.path.join(working_dir, fasta_file)
 
     # Make top level working directory
     print("Running setup. Creating easy_rosetta working directory.")
